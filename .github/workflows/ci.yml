@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+
+# allows pushing the version bumpp, the default is read-only
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # read current version from pom.xml (1.0.0) and save it in $VERSION
+      - name: Get version
+        run: echo "VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
+
+      - name: Docker login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build and push image
+        run: |
+          docker build -t andreiamzu/my-app:$VERSION -t andreiamzu/my-app:latest .
+          docker push andreiamzu/my-app:$VERSION
+          docker push andreiamzu/my-app:latest
+
+      # bump patch (1.0.0 -> 1.0.1) and commit it for the next run
+      - name: Bump patch version
+        run: |
+          IFS=. read MAJOR MINOR PATCH <<< "$VERSION"
+          mvn versions:set -DnewVersion=$MAJOR.$MINOR.$((PATCH + 1)) -DgenerateBackupPoms=false
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git commit -am "Bump version to $MAJOR.$MINOR.$((PATCH + 1))"
+          git push
