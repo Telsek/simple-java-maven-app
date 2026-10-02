@@ -27,6 +27,9 @@ jobs:
           docker push andreiamzu/my-app:$VERSION
           docker push andreiamzu/my-app:latest
 
+      - name: Deploy and Verify
+        run: docker run --rm andreiamzu/my-app:$VERSION
+
       # bump patch (1.0.0 -> 1.0.1) and commit it for the next run
       - name: Bump patch version
         run: |
