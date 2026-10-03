@@ -1,0 +1,41 @@
+name: AWS
+
+on:
+  push:
+    branches: [AWS-Infrastructure]
+
+# allows pushing the version bumpp, the default is read-only
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v5
+
+      # read current version from pom.xml (1.0.0) and save it in $VERSION
+      - name: Get version
+        run: echo "VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
+
+      - name: ECR login
+        run: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 907538072652.dkr.ecr.us-east-1.amazonaws.com
+
+      - name: Build and push image
+        run: |
+          docker build -t 907538072652.dkr.ecr.us-east-1.amazonaws.com/andrei-amzu-ecr:$VERSION -t 907538072652.dkr.ecr.us-east-1.amazonaws.com/andrei-amzu-ecr:latest .
+          docker push 907538072652.dkr.ecr.us-east-1.amazonaws.com/andrei-amzu-ecr:$VERSION
+          docker push 907538072652.dkr.ecr.us-east-1.amazonaws.com/andrei-amzu-ecr:latest
+
+      - name: Deploy and Verify
+        run: docker run --rm 907538072652.dkr.ecr.us-east-1.amazonaws.com/andrei-amzu-ecr:$VERSION
+
+      # bump patch (1.0.0 -> 1.0.1) and commit it for the next run
+      - name: Bump patch version
+        run: |
+          IFS=. read MAJOR MINOR PATCH <<< "$VERSION"
+          mvn versions:set -DnewVersion=$MAJOR.$MINOR.$((PATCH + 1)) -DgenerateBackupPoms=false
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git commit -am "Bump version to $MAJOR.$MINOR.$((PATCH + 1))"
+          git push
