@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
 
 # allows pushing the version bumpp, the default is read-only
 permissions:
